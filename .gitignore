@@ -1,68 +1,81 @@
-# Prerequisites
-*.d
-
-# Compiled Object files
-*.slo
-*.lo
-*.o
+# C / C++ compiled outputs and objects
 *.obj
-
-# Precompiled Headers
-*.gch
-*.pch
-
-# Linker files
-*.ilk
-
-# Debugger Files
-*.pdb
-
-# Compiled Dynamic libraries
+*.o
+*.a
+*.lib
 *.so
 *.dylib
 *.dll
-*.so.*
-
-# Fortran module files
-*.mod
-*.smod
-
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-*.lib
-
-# Executables
 *.exe
 *.out
 *.app
+*.d
+*.slo
+*.lo
+*.gch
+*.pch
+*.ilk
+*.pdb
+*.lai
+*.la
 
-# Build directories
+# Build and output directories
+out/
 build/
 Build/
 build-*/
-
-# CMake generated files
+bin/
+target/
 CMakeFiles/
 CMakeCache.txt
 cmake_install.cmake
 Makefile
 install_manifest.txt
 compile_commands.json
-
-# Temporary files
-*.tmp
-*.log
-*.bak
-*.swp
-
-# vcpkg
 vcpkg_installed/
 
-# debug information files
-*.dwo
+# Python cache and environments
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyd
+.Python
+env/
+venv/
+.venv/
+ENV/
+*.egg-info/
+dist/
+wheels/
+.pytest_cache/
+.coverage
+htmlcov/
 
-# test output & cache
+# IDE and Editor configurations
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Operating System specific files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+*.stackdump
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+*.bak
+*.swp
+*~
+*.dwo
 Testing/
 .cache/
