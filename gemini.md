@@ -1,95 +1,154 @@
-# Fully Discrete Logic Gate Networks (FDLGN) — Gemini Monitoring & Benchmark Suite
+# FDLGN Benchmarking Suite & Architecture Research Log
 
-This document serves as the companion guide and architectural log for the **FDLGN (Fully Discrete Logic Gate Networks)** project. As instructed, all tests, verification harnesses, benchmarks, and experimental implementations are strictly isolated within the [`gemini/`](file:///c:/Users/fishministrator/Projects/fdlgn/gemini/) directory, ensuring zero external modifications to your core codebase in [`src/`](file:///c:/Users/fishministrator/Projects/fdlgn/src/).
+## 1. Overview & Purpose
 
----
+This directory (`gemini/`) and companion document (`gemini.md`) host a comprehensive, modular benchmarking suite comparing diverse neural and logic gate architectures on fundamental Boolean, sequence, and regular-language benchmarks.
 
-## 1. Executive Summary & Core Hypothesis
-
-FDLGN frames machine learning as a **purely discrete Boolean optimization problem**, doing away entirely with continuous relaxations, floating-point weights, and gradient backpropagation:
-
-1. **Equivalence of Compression and Generalization**:
-   A lookup table (LUT) circuit that memorizes individual data points by assigning separate logic pathways to every sample represents maximal Kolmogorov complexity and zero generalization. Compressing that circuit by identifying shared Boolean sub-functions forces it to capture the underlying generative rules of the data.
-2. **"Don't Cares" $\to$ "Yes Cares"**:
-   Any finite training set over binary inputs leaves most input states unconstrained ("don't care" states). Naive memorization assigns arbitrary defaults to these states. At test/deployment time, these unobserved states are encountered ("yes cares"). Different Boolean reduction heuristics resolve these "don't care" states differently; evaluating candidate reductions against a held-out validation set (**Subset B**) identifies the reduction that best generalizes to unseen states.
-3. **Two-Stage Training Flow**:
-   - **Stage 1 (Exact Subset Simulation)**: Synthesize an unoptimized, 100%-accurate circuit on **Subset A**.
-   - **Stage 2 (Local Sub-Circuit Optimization)**: Iterate over local clusters of gates, execute a portfolio of Boolean simplification heuristics, evaluate candidate circuits against **Subset B** using discrete integer mismatch loss, and greedily retain transformations that improve validation accuracy.
+As requested:
+- All custom reference implementations of the FDLGN algorithm have been **removed**.
+- The core codebase in [`src/`](file:///c:/Users/fishministrator/Projects/fdlgn/src/) remains completely **untouched**.
+- The suite evaluates external baselines and architectures first, establishing rigorous empirical performance baselines before connecting FDLGN.
 
 ---
 
-## 2. The `gemini/` Test & Benchmark Suite
+## 2. Models in the Benchmarking Suite
 
-The [`gemini/`](file:///c:/Users/fishministrator/Projects/fdlgn/gemini/) folder contains self-contained tools designed to test, verify, and validate the FDLGN paradigm:
+The suite evaluates 6 distinct architectures across both floating-point and discrete/relaxed logic paradigms:
 
-### 2.1 Components
+### 2.1 Conventional Neural Networks
+1. **MLP (Multi-Layer Perceptron)**:
+   - Deep feedforward neural network with LayerNorm and GELU non-linearities.
+   - Evaluates general continuous representation learning.
+2. **CNN (1D Convolutional Neural Network)**:
+   - 1D sliding convolution with batch normalization, GELU, and max/adaptive pooling.
+   - Inductive bias: translation equivariance and local spatial pattern matching.
+3. **Transformer (Self-Attention Sequence Model)**:
+   - Multi-Head Self-Attention (MHA) over tokenized binary register sequences with sinusoidal positional encodings and layer normalization.
+   - Inductive bias: all-to-all token interaction and permutation-aware relational attention.
 
-1. **[`test_gate.cpp`](file:///c:/Users/fishministrator/Projects/fdlgn/gemini/test_gate.cpp)**:
-   - Exhaustively validates all 256 possible 3-input truth tables across all 8 input combinations (2,048 checks).
-   - Verifies canonical logic primitives (AND3, OR3, XOR3, 2-to-1 Multiplexer).
-   - Benchmarks raw `Gate::Process` throughput: **617.18 Million evaluations/sec** on CPU.
-
-2. **[`test_topological_circuit.cpp`](file:///c:/Users/fishministrator/Projects/fdlgn/gemini/test_topological_circuit.cpp)**:
-   - Validates multi-layer topological circuits built using the wire-indexed architecture.
-   - Tests a 1-bit Full Adder (Sum = XOR3, Carry = MAJ3) and an 8-input 4-bit Ripple Carry Adder across all 256 input additions with 100% mathematical precision.
-   - Tests the discrete integer mismatch `Loss` function.
-
-3. **[`stage1_exact_synthesis.hpp`](file:///c:/Users/fishministrator/Projects/fdlgn/gemini/stage1_exact_synthesis.hpp)** & **[`test_stage1_synthesis.cpp`](file:///c:/Users/fishministrator/Projects/fdlgn/gemini/test_stage1_synthesis.cpp)**:
-   - Implements a deterministic Stage 1 exact subset synthesizer adapted to the new wire-indexed topological model.
-   - For any dataset over $N$ binary inputs, constructs 3-input LUT decoder chains grouped into 3-input OR trees.
-   - Verifies **100.00% exact memorization** across input widths from 1 to 10 bits and canonical functions (XOR, Majority).
-
-4. **[`stage2_compression_prototype.hpp`](file:///c:/Users/fishministrator/Projects/fdlgn/gemini/stage2_compression_prototype.hpp)**:
-   - Implements an iterative Stage 2 local sub-circuit optimizer.
-   - Employs a portfolio of discrete transformations:
-     - **Don't-Care Resolution via Truth Table Bit Permutation**: Iteratively tests single-bit mutations in each gate's 8-bit truth table.
-     - **Local Sub-Circuit Bypass / Identity Reduction**: Replaces gates with constants (0x00, 0xFF) or pass-through wires when redundant.
-   - Evaluates each candidate against **Subset B** and greedily preserves changes that decrease validation error while preserving training consistency.
-
-5. **[`benchmark_fdlgn_e2e.cpp`](file:///c:/Users/fishministrator/Projects/fdlgn/gemini/benchmark_fdlgn_e2e.cpp)**:
-   - End-to-end benchmark demonstrating generalization on unseen validation data across diverse Boolean classification tasks.
-
-6. **[`run_all.bat`](file:///c:/Users/fishministrator/Projects/fdlgn/gemini/run_all.bat)**:
-   - Automated batch runner that compiles and executes all four test and benchmark executables in sequence with `-O3` optimizations.
+### 2.2 Differentiable Logic Gate Networks
+4. **Basic DLGN (Petersen et al., NeurIPS 2022)**:
+   - 2-input logic gates with 16-way categorical softmax distributions over all canonical 2-input Boolean truth tables.
+   - Static random input wiring and `GroupSum` voting readout.
+5. **LDLGN (Light DLGN / TT-LUT2, Rüttgers et al., ICLR 2026)**:
+   - Input-Wise Parameterization (IWP): direct parameterization of the 4 minterms ($2^2=4$) via sigmoid multilinear relaxation, reducing parameter count by 75% relative to categorical DLGN.
+6. **Conv Soft DenseSkip-1 LUT4 (from `argus-dlgn-research` / `dlgn_research` Exp 21/22)**:
+   - **Stage 1 (Sliding Tree-Convolutions + OR-Pooling)**: Scans registers using 1D sliding windows of 4-input LUT trees ($K=8, S=1$), followed by continuous logical OR-pooling across positions ($1 - \prod (1 - a_{f,t})$).
+   - **Stage 2 (DenseSkip-1 Multi-Hop Residual Backbone)**: 4-layer cascade where each gate samples 3 inputs from layer $l-1$ and 1 skip connection from all preceding layers $\{0 \dots l-1\}$ and the initial input.
+   - **Stage 3 (GroupSum Readout)**: Partitions final gate activations into balanced class voting accumulators.
+   - **Optimization**: Continuous multilinear relaxation (`mode="soft"`).
 
 ---
 
-## 3. Empirical Benchmark Results
+## 3. Standardized Benchmark Tasks
 
-The benchmark was executed on Windows using `g++` (MinGW-W64 14.2.0, `-O3`). Below are the results comparing raw Stage 1 memorization against Stage 2 optimization:
+The suite tests models on 4 distinct problem domains (4,000 training samples, 1,000 test samples, balanced 50/50 splits, strict zero data leakage):
 
-| Task / Problem | Input Bits | Subset A (Train) | Subset B (Val) | Gate Count | Stage 1 Train Acc | Stage 1 Val Acc (Raw) | Stage 2 Val Acc (Generalization) | Accuracy Gain on Unseen Data | Inference Speed |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **5-Bit Majority** | 5 | 16 | 16 | 35 | **100.0%** | 31.25% | **93.75%** | **+62.50%** | 7.7M samples/s |
-| **7-Bit Majority** | 7 | 64 | 64 | 204 | **100.0%** | 34.38% | **93.75%** | **+59.38%** | 2.8M samples/s |
-| **2-to-4 MUX** | 6 | 32 | 32 | 105 | **100.0%** | 50.00% | **100.00%** | **+50.00%** | 4.8M samples/s |
-| **4-Bit Parity (XOR)** | 4 | 8 | 8 | 19 | **100.0%** | 50.00% | **100.00%** | **+50.00%** | 11.2M samples/s |
-| **6-Bit Parity (XOR)** | 6 | 32 | 32 | 105 | **100.0%** | 50.00% | **100.00%** | **+50.00%** | 4.9M samples/s |
-
-### Key Observations:
-- **Confirmation of the Core Hypothesis**:
-  In every tested domain, the raw Stage 1 circuit had poor validation accuracy (31%–50%) because unseen input combinations triggered unconfigured paths ("don't cares" evaluating to 0). Stage 2 discrete compression resolved these states, resulting in massive generalization gains (+50% to +62.5%), achieving 93.75%–100% accuracy on completely unseen data.
-- **Strict Conservation of Training Knowledge**:
-  In all cases, training accuracy on Subset A remained **100% preserved (0 errors)** throughout optimization.
-- **Extreme Evaluation Speed**:
-  Inference throughput achieved **2.8 to 11.2 million samples per second** (0.09 to 0.35 $\mu$s per sample) without GPU acceleration, purely on single-threaded CPU bitwise logic.
+1. **Shifted Substring Matching**:
+   - Detects an 8-bit needle (`10110010`) positioned at a uniformly random offset in a 64-bit register.
+   - Positive samples contain the needle; negative samples are verified to not contain the needle.
+   - Tests spatial translation invariance and exact multi-bit pattern matching.
+2. **Tomita Grammar 4 (Formal Language / Automata)**:
+   - Classifies strings from the regular language $L_4 = \{ w \in \{0, 1\}^* \mid \text{'000' is not a substring of } w \}$.
+   - Tests sequential state tracking and long-range constraint satisfaction.
+3. **Parity-32 (High-Frequency Non-Linearity)**:
+   - Computes $\bigoplus_{i=0}^{31} x_i$ (32-bit odd parity zero-padded to 64 bits).
+   - A notoriously hard problem for continuous gradient descent that produces catastrophic failure in standard MLPs.
+4. **Majority-64 (Counting & Threshold Logic)**:
+   - Computes $\mathbb{I}\left(\sum_{i=0}^{63} x_i \ge 32\right)$ across 64 binary inputs.
+   - Tests spatial integration, accumulator scaling, and threshold logic.
 
 ---
 
-## 4. How to Run
+## 4. Benchmarking Suite Directory Layout (`gemini/`)
 
-To run all tests and benchmarks, open PowerShell in the project root and execute:
+```
+gemini/
+├── benchmarks/
+│   ├── __init__.py               # Unified benchmark loader (load_benchmark)
+│   ├── shifted_substring.py      # Shifted Substring generator
+│   ├── tomita4.py                # Tomita Grammar 4 generator
+│   ├── parity32.py               # Parity-32 generator
+│   └── majority64.py             # Majority-64 generator
+├── models/
+│   ├── __init__.py               # Model registry & factory (create_model)
+│   ├── base.py                   # Base module, GroupSum readout, parameter counters
+│   ├── mlp.py                    # Multi-Layer Perceptron
+│   ├── cnn.py                    # 1D Convolutional Neural Network
+│   ├── transformer.py            # Sequence Transformer with Self-Attention
+│   ├── dlgn.py                   # Basic DLGN (Petersen et al. 2022)
+│   ├── ldlgn.py                  # Light DLGN / TT-LUT2 (Rüttgers et al. 2026)
+│   └── conv_denseskip_lut4.py    # Conv Soft DenseSkip-1 LUT4 (Argus DLGN Research)
+├── runner.py                     # Standardized training loop, speed & metric evaluator
+├── run_suite.py                  # Master CLI runner for full benchmark matrix
+├── run_suite.bat                 # Windows GPU launcher (auto-detects CUDA venv)
+├── results.json                  # Output JSON logs of benchmark metrics
+└── benchmark_summary.md          # Formatted Markdown report
+```
+
+---
+
+## 5. Empirical Baseline Benchmark Results (15 Epochs on GPU)
+
+The suite was executed across all 6 models and 4 benchmarks on the NVIDIA GeForce RTX 3060:
+
+| Model | Benchmark | Params | Train Acc | Test Acc (Peak) | Train Time | Throughput |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: |
+| **MLP** | shifted_substring | 25,602 | 92.12% | 59.90% (59.90%) | 3.53s | 376,393 /s |
+| **CNN** | shifted_substring | 27,362 | 100.00% | **100.00% (100.00%)** | 5.05s | 296,473 /s |
+| **Transformer** | shifted_substring | 17,282 | 50.02% | 50.00% (51.90%) | 9.29s | 108,650 /s |
+| **DLGN** | shifted_substring | 8,192 | 50.00% | 50.00% (50.00%) | 9.09s | 109,593 /s |
+| **LDLGN** | shifted_substring | 2,048 | 54.73% | 52.40% (53.20%) | 8.55s | 166,693 /s |
+| **Conv Soft DenseSkip-1 LUT4** | shifted_substring | 9,728 | 65.15% | 53.90% (54.30%) | 21.04s | 52,428 /s |
+| **MLP** | tomita4 | 25,602 | 98.83% | 91.70% (92.50%) | 2.68s | 1,149,198 /s |
+| **CNN** | tomita4 | 27,362 | 100.00% | **100.00% (100.00%)** | 3.57s | 410,249 /s |
+| **Transformer** | tomita4 | 17,282 | 74.60% | 77.00% (77.00%) | 8.46s | 126,005 /s |
+| **DLGN** | tomita4 | 8,192 | 69.53% | 70.90% (70.90%) | 8.61s | 142,396 /s |
+| **LDLGN** | tomita4 | 2,048 | 74.33% | 76.50% (76.50%) | 7.89s | 74,291 /s |
+| **Conv Soft DenseSkip-1 LUT4** | tomita4 | 9,728 | 82.38% | 81.60% (81.60%) | 22.14s | 44,597 /s |
+| **MLP** | parity32 | 25,602 | 78.55% | 52.60% (53.90%) | 3.16s | 934,419 /s |
+| **CNN** | parity32 | 27,362 | 64.45% | 49.50% (50.80%) | 4.59s | 356,852 /s |
+| **Transformer** | parity32 | 17,282 | 50.00% | 50.00% (50.00%) | 9.63s | 122,977 /s |
+| **DLGN** | parity32 | 8,192 | 50.00% | 50.00% (50.00%) | 9.97s | 128,159 /s |
+| **LDLGN** | parity32 | 2,048 | 50.00% | 50.00% (50.00%) | 8.94s | 157,775 /s |
+| **Conv Soft DenseSkip-1 LUT4** | parity32 | 9,728 | 55.58% | 50.50% (52.90%) | 23.28s | 30,643 /s |
+| **MLP** | majority64 | 25,602 | 96.40% | 80.20% (85.60%) | 3.31s | 565,533 /s |
+| **CNN** | majority64 | 27,362 | 99.62% | 98.20% (98.90%) | 4.49s | 373,659 /s |
+| **Transformer** | majority64 | 17,282 | 100.00% | **100.00% (100.00%)** | 9.52s | 105,711 /s |
+| **DLGN** | majority64 | 8,192 | 86.50% | 83.10% (83.10%) | 9.51s | 142,421 /s |
+| **LDLGN** | majority64 | 2,048 | 89.17% | 85.30% (85.40%) | 9.11s | 132,702 /s |
+| **Conv Soft DenseSkip-1 LUT4** | majority64 | 9,728 | 96.22% | 92.60% (92.60%) | 22.84s | 47,035 /s |
+
+### Key Benchmark Insights:
+1. **Parity-32 Demonstrates the Continuous Gradient Bottleneck**:
+   Every continuous gradient-based architecture (MLP, CNN, Transformer, DLGN, LDLGN, Conv-LUT4) fails completely on Parity-32 (~50% chance accuracy). Continuous relaxation surfaces are virtually flat or riddled with orthogonal local minima for high-frequency XOR parity. This benchmark directly highlights the promise of **Fully Discrete Logic Gate Networks (FDLGN)**, which operates directly on Boolean algebraic reductions.
+2. **Translation Equivariance on Shifted Substring**:
+   The CNN achieves 100% test accuracy on Shifted Substring due to sliding convolutional inductive bias, while flat DLGNs and MLPs struggle to detect the needle when displaced across register offsets.
+3. **Formal Grammar Tracking (Tomita 4)**:
+   CNN achieves 100% and MLP reaches 91.70%, with Conv Soft DenseSkip-1 LUT4 reaching 81.60% and Light DLGN reaching 76.50%.
+
+---
+
+## 6. How to Run the Benchmark Suite
+
+To run all models across all benchmarks on GPU:
 
 ```powershell
 cd gemini
-.\run_all.bat
+.\run_suite.bat
 ```
 
-Or run any individual test directly:
+To run a specific subset of models or benchmarks:
 ```powershell
 cd gemini
-g++ -std=c++17 -O3 test_gate.cpp -o test_gate.exe; .\test_gate.exe
-g++ -std=c++17 -O3 test_topological_circuit.cpp -o test_topological_circuit.exe; .\test_topological_circuit.exe
-g++ -std=c++17 -O3 test_stage1_synthesis.cpp -o test_stage1_synthesis.exe; .\test_stage1_synthesis.exe
-g++ -std=c++17 -O3 benchmark_fdlgn_e2e.cpp -o benchmark_fdlgn_e2e.exe; .\benchmark_fdlgn_e2e.exe
+.\run_suite.bat --models cnn conv_soft_denseskip_lut4 mlp --benchmarks shifted_substring tomita4 --epochs 20
 ```
+
+---
+
+## 7. Integration Interface for FDLGN
+
+When your native FDLGN training algorithm is ready to be connected to the suite:
+1. Wrap the FDLGN model with the standard `forward(x) -> logits` / `predict(x)` signature.
+2. Register it in [`gemini/models/__init__.py`](file:///c:/Users/fishministrator/Projects/fdlgn/gemini/models/__init__.py) under `MODEL_REGISTRY["fdlgn"]`.
+3. Add native discrete inference latency benchmarking to [`gemini/runner.py`](file:///c:/Users/fishministrator/Projects/fdlgn/gemini/runner.py).
